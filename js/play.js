@@ -17,7 +17,7 @@
   let room = (params.get('room') || '').toUpperCase().slice(0, 4);
 
   let peer = null, conn = null, view = null, joined = false, wantConnected = false;
-  let lastKey = '', lieErr = '', draft = '', retryTimer;
+  let lastKey = '', lieErr = '', lieOk = '', draft = '', retryTimer;
 
   // ---------- UI helpers ----------
   function overlay(msg) { $('#overlayMsg').textContent = msg; $('#overlay').classList.add('show'); }
@@ -83,26 +83,45 @@
   }
 
   // ---------- Networking ----------
+  // The phone keeps two separate links: the Peer's socket to the public signaling server (only needed to
+  // *start* a connection, and iOS drops it all the time) and the data channel to the host. Only a dead data
+  // channel means we're disconnected – signaling hiccups must never tear down a working channel.
+  const channelUp = () => !!(conn && conn.open);
+  let connecting = false, connSeq = 0, overlayTimer;
+
   function connect() {
     wantConnected = true;
     clearTimeout(retryTimer);
-    overlay(joined ? 'מתחברים מחדש…' : `מתחברים לחדר ${room}…`);
+    if (channelUp() || connecting) return;
+    if (!joined) overlay(`מתחברים לחדר ${room}…`);
     if (!peer || peer.destroyed) {
       peer = new Peer(PEER_OPTS);
-      peer.on('open', openConn);
+      peer.on('open', () => { if (!channelUp()) openConn(); });
       peer.on('error', onPeerError);
-      peer.on('disconnected', () => { if (!peer.destroyed) setTimeout(() => peer.reconnect(), 1000); });
+      peer.on('disconnected', () => setTimeout(() => { if (peer && !peer.destroyed && peer.disconnected) try { peer.reconnect(); } catch (e) {} }, 1500));
     } else if (peer.open) openConn();
-    else if (peer.disconnected) peer.reconnect();
+    else if (peer.disconnected) try { peer.reconnect(); } catch (e) {}
   }
 
   function openConn() {
-    if (!wantConnected) return;
+    if (!wantConnected || channelUp() || connecting) return;
+    connecting = true;
     if (conn) try { conn.close(); } catch (e) {}
-    const c = peer.connect(PEER_PREFIX + room, { reliable: true });
+    const seq = ++connSeq;
+    const c = peer.connect(PEER_PREFIX + room, { reliable: true, serialization: 'json' });
     conn = c;
-    const timeout = setTimeout(() => { if (c === conn && !c.open) { try { c.close(); } catch (e) {} scheduleRetry(); } }, 9000);
-    c.on('open', () => { clearTimeout(timeout); c.send({ t: 'join', pid, name, avatar, g: gender }); });
+    const timeout = setTimeout(() => {
+      if (c !== conn || c.open) return;
+      connecting = false;
+      try { c.close(); } catch (e) {}
+      scheduleRetry();
+    }, 9000);
+    c.on('open', () => {
+      clearTimeout(timeout);
+      if (c !== conn) { try { c.close(); } catch (e) {} return; } // a newer attempt replaced this one
+      connecting = false;
+      c.send({ t: 'join', pid, seq: Date.now() * 1000 + seq, name, avatar, g: gender });
+    });
     c.on('data', (m) => { if (c === conn) onData(m); });
     c.on('close', () => { if (c === conn) lost(); });
     c.on('error', () => { if (c === conn) lost(); });
@@ -110,33 +129,39 @@
 
   function lost() {
     conn = null;
+    connecting = false;
     if (!wantConnected) return;
-    overlay('החיבור נותק – מתחברים מחדש…');
-    scheduleRetry();
+    // Don't flash a scary overlay for a blip that heals itself within a moment
+    clearTimeout(overlayTimer);
+    overlayTimer = setTimeout(() => { if (!channelUp()) overlay('החיבור נותק – מתחברים מחדש…'); }, 2500);
+    scheduleRetry(700);
   }
-  function scheduleRetry() {
+  function scheduleRetry(ms = 1800) {
     clearTimeout(retryTimer);
-    retryTimer = setTimeout(() => wantConnected && connect(), 1800);
+    retryTimer = setTimeout(() => wantConnected && connect(), ms);
   }
 
   function onPeerError(e) {
     console.warn('peer error', e.type, e);
     if (e.type === 'peer-unavailable') {
+      connecting = false;
       if (!joined) {
         wantConnected = false;
         hideOverlay();
         showJoin(`לא מצאנו חדר עם הקוד ${room} 🤔 ${G('בדוק', 'בדקי')} את הקוד על המסך`);
       } else {
         overlay('המסך הראשי לא זמין – מנסים שוב…');
-        scheduleRetry();
+        scheduleRetry(3000);
       }
       return;
     }
-    if (wantConnected) scheduleRetry();
+    // Signaling-server trouble: harmless while the data channel is up
+    if (channelUp()) return;
+    if (wantConnected) scheduleRetry(2500);
   }
 
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && wantConnected && !(conn && conn.open)) connect();
+    if (document.visibilityState === 'visible' && wantConnected && !channelUp()) connect();
   });
 
   function onData(m) {
@@ -157,9 +182,23 @@
       if (b) b.disabled = false;
       return;
     }
+    if (m.t === 'lieBonus') {
+      const box = $('#lieErr');
+      lieOk = m.msg;
+      if (box) box.innerHTML = `<div class="ok pop-in">${esc(m.msg)}</div>`;
+      lieErr = '';
+      SFX.play('ding');
+      buzz([40, 30, 40, 30, 80]);
+      const inp = $('#lie');
+      if (inp) { inp.value = ''; draft = ''; $('#cnt').textContent = '0'; }
+      const b = $('#sendLie');
+      if (b) b.disabled = false;
+      return;
+    }
     if (m.t === 'view') {
       if (!joined) SFX.play('join');
       joined = true;
+      clearTimeout(overlayTimer);
       hideOverlay();
       render(m);
     }
@@ -187,7 +226,7 @@
     $('#me').innerHTML = `<span class="pts">${v.me.score.toLocaleString()}</span><div class="avatar sm" style="--c:${v.me.color}">${v.me.avatar}</div>`;
     if (key === lastKey) return;
     lastKey = key;
-    if (phaseChanged) { buzz(); lieErr = ''; draft = ''; }
+    if (phaseChanged) { buzz(); lieErr = ''; lieOk = ''; draft = ''; }
     timerBar(v);
     (screens[v.phase] || screens.wait)(v);
   }
@@ -241,7 +280,7 @@
         <div class="scene">
           <span class="q-cat" style="font-size:1rem">${esc(v.cat)}</span>
           <p class="pq" style="margin-top:14px">${qHTML(v.q)}</p>
-          <div id="lieErr">${lieErr ? `<div class="err">${esc(lieErr)}</div>` : ''}</div>
+          <div id="lieErr">${lieErr ? `<div class="err">${esc(lieErr)}</div>` : lieOk ? `<div class="ok">${esc(lieOk)}</div>` : ''}</div>
           <input class="input" id="lie" maxlength="${MAX_LIE}" autocomplete="off" placeholder="${G('כתוב', 'כתבי')} שקר משכנע…" value="${esc(draft)}">
           <div class="counter"><span id="cnt">${draft.length}</span>/${MAX_LIE}</div>
           <button class="btn block big" id="sendLie">שליחת השקר 🤥</button>
@@ -287,11 +326,12 @@
 
     scores(v) {
       const lines = [];
+      if (v.bonus) lines.push(`🧠 ${G('ידעת', 'ידעת')} את התשובה מראש! +${v.bonus.toLocaleString()} בונוס`);
       if (v.gotTruth) lines.push(`🎯 ${G('מצאת', 'מצאת')} את האמת!`);
       else if (v.fellFor) lines.push(`🙈 ${G('נפלת', 'נפלת')} בשקר: "${esc(v.fellFor)}"`);
       if (v.fooled) lines.push(`😈 ${G('עבדת', 'עבדת')} על ${v.fooled === 1 ? 'שחקן אחד' : v.fooled + ' שחקנים'}!`);
       center(`
-        <div class="big-emoji pop-in">${v.gotTruth || v.fooled ? '🥳' : '😅'}</div>
+        <div class="big-emoji pop-in">${v.gotTruth || v.fooled || v.bonus ? '🥳' : '😅'}</div>
         <div class="result-num pop-in">+${v.delta.toLocaleString()}</div>
         ${lines.map((l) => `<p style="color:#fff;font-weight:700">${l}</p>`).join('')}
         <p>האמת: <b style="color:var(--good)">${esc(v.truth)}</b></p>

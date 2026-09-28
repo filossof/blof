@@ -6,6 +6,7 @@
   const LENGTHS = { short: [2, 2], normal: [3, 3], long: [4, 4] };
   const T = { pick: 15, lie: 75, lieKids: 100, choose: 30, chooseKids: 45, scores: 9 };
   const RING = 276.46; // 2πr for r=44
+  const TRUTH_BONUS = 500; // for typing the real answer as your lie (x round multiplier)
 
   const S = {
     code: null, peer: null,
@@ -79,7 +80,13 @@
     let p = S.players.get(pid);
     if (p) {
       p.gender = gender;
-      if (p.conn && p.conn !== conn) try { p.conn.close(); } catch (e) {}
+      const seq = Number(m.seq) || 0;
+      if (p.conn && p.conn !== conn) {
+        // A late join from an older connection attempt must not kick out the newer one
+        if (seq && p.seq && seq < p.seq) { try { conn.close(); } catch (e) {} return; }
+        try { p.conn.close(); } catch (e) {}
+      }
+      p.seq = seq;
       p.conn = conn;
       p.online = true;
       if (S.phase === 'lobby') {
@@ -96,7 +103,7 @@
         name: uniqueName(name),
         avatar: AVATARS.includes(m.avatar) && !taken.has(m.avatar) ? m.avatar : AVATARS.find((a) => !taken.has(a)),
         color: COLORS.find((c) => !usedColors.has(c)) || COLORS[0],
-        score: 0, conn, online: true, suggest: null, gender,
+        score: 0, conn, online: true, suggest: null, gender, seq: Number(m.seq) || 0,
       };
       S.players.set(pid, p);
       SFX.play('join');
@@ -167,6 +174,7 @@
         const mine = cur.options.find((o) => o.authors.includes(p.id));
         const choice = cur.choices.has(p.id) ? cur.options[cur.choices.get(p.id)] : null;
         v.delta = cur.delta[p.id] || 0;
+        v.bonus = cur.bonus[p.id] || 0;
         v.truth = cur.q.a;
         v.gotTruth = !!choice?.truth;
         v.fellFor = choice && !choice.truth ? choice.text : null;
@@ -464,7 +472,7 @@
     ++S.flow;
     S.used.add(q);
     const r = S.plan[S.roundIdx];
-    S.cur = { q, mult: r.mult, lies: new Map(), choices: new Map(), options: [], delta: {}, prev: {} };
+    S.cur = { q, mult: r.mult, lies: new Map(), choices: new Map(), options: [], delta: {}, prev: {}, bonus: {} };
     for (const p of S.players.values()) p.suggest = null;
     S.phase = 'lie';
     setSkip(true);
@@ -486,7 +494,15 @@
     text = String(text || '').replace(/\s+/g, ' ').trim().slice(0, MAX_LIE);
     if (!text) return;
     const err = (msg) => { try { p.conn.send({ t: 'lieError', msg }); } catch (e) {} };
-    if (isTruth(text, S.cur.q)) return err(`אופס! ${gw(p.gender, 'כתבת', 'כתבת')} בדיוק את התשובה הנכונה 😅 ${gw(p.gender, 'נסה', 'נסי')} שקר אחר`);
+    if (isTruth(text, S.cur.q)) {
+      // Knowing the real answer earns a one-time bonus – but they still owe us a lie
+      if (S.cur.bonus[p.id]) return err(`זו עדיין התשובה הנכונה 😉 ${gw(p.gender, 'כתוב', 'כתבי')} שקר`);
+      const pts = TRUTH_BONUS * S.cur.mult;
+      S.cur.bonus[p.id] = pts;
+      SFX.play('ding');
+      try { p.conn.send({ t: 'lieBonus', msg: `🎯 ${gw(p.gender, 'ידעת', 'ידעת')} את התשובה הנכונה! +${pts.toLocaleString()} בונוס. עכשיו ${gw(p.gender, 'כתוב', 'כתבי')} שקר 🤥` }); } catch (e) {}
+      return;
+    }
     if (S.kids && isBad(text)) return err(`בוא${gw(p.gender, '', 'י')} נשמור על שפה נקייה 😇 ${gw(p.gender, 'נסה', 'נסי')} משהו אחר`);
     S.cur.lies.set(p.id, { text });
     SFX.play('submit');
@@ -525,7 +541,7 @@
     opts.push({ text: q.a, truth: true, authors: [] });
     const keys = new Set([...groups.keys(), ...[q.a, ...(q.alt || [])].map(normCore)]);
     for (const h of shuffle(q.lies)) {
-      if (opts.length >= 5) break;
+      if (opts.some((o) => o.house)) break; // exactly one house lie
       const k = normCore(h);
       if (keys.has(k)) continue;
       keys.add(k);
@@ -572,7 +588,7 @@
     clearTimer();
     const cur = S.cur;
     const d = {};
-    for (const p of S.players.values()) d[p.id] = 0;
+    for (const p of S.players.values()) d[p.id] = cur.bonus[p.id] || 0;
     for (const [pid, oid] of cur.choices) {
       const o = cur.options[oid];
       if (o.truth) d[pid] += 1000 * cur.mult;
