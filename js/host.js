@@ -96,7 +96,7 @@
       }
     } else {
       if (S.phase !== 'lobby') return reject(conn, `המשחק כבר התחיל 🙈 ${gw(m.g, 'חכה', 'חכי')} למשחק הבא`);
-      if (S.players.size >= MAX_PLAYERS) return reject(conn, 'החדר מלא – מקסימום 8 שחקנים');
+      if (S.players.size >= MAX_PLAYERS) return reject(conn, `החדר מלא – מקסימום ${MAX_PLAYERS} שחקנים`);
       const taken = takenAvatars();
       const usedColors = new Set([...S.players.values()].map((x) => x.color));
       p = {
@@ -286,7 +286,6 @@
           <div class="start-row">
             <button class="btn big" id="startBtn">יאללה, מתחילים! 🚀</button>
             <span class="hint" id="startHint"></span>
-            <button class="btn ghost sound-hint" id="soundHint" hidden>🔊 לחצו להפעלת מוזיקה וצלילים</button>
           </div>
         </div>
       </div>`;
@@ -311,11 +310,16 @@
       syncMusicUI();
     }));
     $('#startBtn').onclick = startGame;
-    // Browsers keep audio locked until the first click on the page
-    if (!Sound.ready()) {
-      $('#soundHint').hidden = false;
-      $('#soundHint').onclick = () => { Sound.init(); SFX.unlock(); };
-      Sound.onReady(() => { const h = $('#soundHint'); if (h) h.hidden = true; });
+    // Browsers keep audio locked until the first click on the page. The hint floats (position: fixed) so
+    // hiding it never shifts the layout under the cursor mid-click.
+    if (!Sound.ready() && !$('#soundHint')) {
+      const hint = document.createElement('button');
+      hint.id = 'soundHint';
+      hint.className = 'btn ghost sound-hint';
+      hint.textContent = '🔊 לחצו להפעלת מוזיקה וצלילים';
+      hint.onclick = () => { Sound.init(); SFX.unlock(); };
+      document.body.appendChild(hint);
+      Sound.onReady(() => hint.remove());
     }
     $('#lobbyPlayers').onclick = (e) => {
       const el = e.target.closest('.pslot.filled');
@@ -364,6 +368,7 @@
 
   function renderBar() {
     if (['lobby', 'scores', 'gameover', 'boot'].includes(S.phase)) { bar.innerHTML = ''; return; }
+    bar.classList.toggle('compact', S.players.size > 8);
     const ids = [...S.players.keys()].join('|');
     if (bar.dataset.ids !== ids) {
       bar.dataset.ids = ids;
@@ -562,8 +567,9 @@
     const opts = [...groups.values()];
     opts.push({ text: q.a, truth: true, authors: [] });
     const keys = new Set([...groups.keys(), ...[q.a, ...(q.alt || [])].map(normCore)]);
-    for (const h of shuffle(q.lies)) {
-      if (opts.some((o) => o.house)) break; // exactly one house lie
+    // One house lie for small groups; with many players there are enough answers already
+    for (const h of groups.size <= HOUSE_LIE_MAX ? shuffle(q.lies) : []) {
+      if (opts.some((o) => o.house)) break;
       const k = normCore(h);
       if (keys.has(k)) continue;
       keys.add(k);
@@ -584,14 +590,15 @@
           ${timerHTML()}
           <div class="q-text" style="margin:0;font-size:clamp(1.5rem,3vw,2.5rem)">${qHTML(q.q)}</div>
         </div>
-        <div class="opts stagger">${options.map((o) => `<div class="opt">${esc(o.text)}</div>`).join('')}</div>
+        <div class="opts stagger ${options.length > 8 ? 'many' : ''}">${options.map((o) => `<div class="opt">${esc(o.text)}</div>`).join('')}</div>
         <p class="q-sub" style="margin-top:24px">מה האמת? בחרו בטלפון 🔎</p>
       </div>`;
     renderBar();
     broadcast();
     SFX.play('whoosh');
     speak('איזו מהתשובות היא האמת?');
-    timerStart(S.kids ? T.chooseKids : T.choose, endChoose);
+    // More answers to read -> a bit more time (2s for each answer beyond 6)
+    timerStart((S.kids ? T.chooseKids : T.choose) + Math.max(0, options.length - 6) * 2, endChoose);
   }
 
   function onChoose(p, id) {
@@ -649,11 +656,14 @@
       if (!(await alive(2200))) return;
     }
 
+    // Big groups can have many fooled lies to reveal – move through them a little faster
+    const pace = lies.length > 4 ? 0.7 : 1;
     async function revealOne(o, isTruth) {
       const ps = pickers(o);
+      const k = isTruth ? 1 : pace;
       box.innerHTML = `<div class="rv-card pop-in">${esc(o.text)}</div><div class="rv-row" id="rvPick"></div><div class="rv-row" id="rvVerdict"></div>`;
       SFX.play('whoosh');
-      if (!(await alive(1000))) return false;
+      if (!(await alive(1000 * k))) return false;
       const pr = $('#rvPick');
       pr.innerHTML = ps.length
         ? `<span class="label">${isTruth ? 'מצאו את האמת:' : 'נפלו בפח:'}</span>`
@@ -661,10 +671,10 @@
       for (const p of ps) {
         pr.insertAdjacentHTML('beforeend', chip(p, isTruth ? `+${1000 * m}` : ''));
         SFX.play('pop');
-        if (!(await alive(380))) return false;
+        if (!(await alive(380 * k))) return false;
       }
       SFX.play('drum');
-      if (!(await alive(950))) return false;
+      if (!(await alive(950 * k))) return false;
       const card = $('.rv-card', box);
       const vd = $('#rvVerdict');
       if (isTruth) {
@@ -686,7 +696,7 @@
           speak(`השקר של ${authors.map((a) => a.name).join(' ו')}`);
         }
       }
-      return alive(isTruth ? 3300 : 2900);
+      return alive(isTruth ? 3300 : 2900 * pace);
     }
 
     for (const o of lies) if (!(await revealOne(o, false))) return;
