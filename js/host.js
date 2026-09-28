@@ -6,6 +6,7 @@
   const LENGTHS = { short: [2, 2], normal: [3, 3], long: [4, 4] };
   const T = { pick: 15, lie: 75, lieKids: 100, choose: 30, chooseKids: 45, scores: 9 };
   const RING = 276.46; // 2πr for r=44
+  const THEME_LABELS = { bouncy: '🎈 קופצני', tropical: '🌴 טרופי', space: '🚀 חלל', lofi: '🎧 לו-פיי', arcade: '🕹️ ארקייד', musicbox: '🎶 תיבת נגינה' };
   const TRUTH_BONUS = 500; // for typing the real answer as your lie (x round multiplier)
 
   const S = {
@@ -274,6 +275,9 @@
           <div class="lobby-players" id="lobbyPlayers"></div>
           <div class="settings glass">
             <label class="toggle"><input type="checkbox" id="kidsT" ${S.kids ? 'checked' : ''}><span class="sw"></span>מצב ילדים 🧒</label>
+            <div class="toggle music-pick">מוזיקה:
+              <div class="seg" id="themeSeg">${Sound.themes.map((id) => `<button data-t="${id}" class="${Sound.musicOn && Sound.theme === id ? 'on' : ''}">${THEME_LABELS[id] || id}</button>`).join('')}<button data-t="off" class="${Sound.musicOn ? '' : 'on'}">🔇 בלי</button></div>
+            </div>
             <div class="toggle">אורך המשחק:
               <div class="seg" id="lenSeg">${Object.entries({ short: 'קצר', normal: 'רגיל', long: 'ארוך' })
                 .map(([k, l]) => `<button data-k="${k}" class="${S.length === k ? 'on' : ''}">${l}</button>`).join('')}</div>
@@ -282,6 +286,7 @@
           <div class="start-row">
             <button class="btn big" id="startBtn">יאללה, מתחילים! 🚀</button>
             <span class="hint" id="startHint"></span>
+            <button class="btn ghost sound-hint" id="soundHint" hidden>🔊 לחצו להפעלת מוזיקה וצלילים</button>
           </div>
         </div>
       </div>`;
@@ -298,7 +303,20 @@
       $$('#lenSeg button').forEach((x) => x.classList.toggle('on', x === b));
       SFX.play('pop');
     }));
+    $$('#themeSeg button').forEach((b) => (b.onclick = () => {
+      Sound.init();
+      const t = b.dataset.t;
+      if (t === 'off') { if (Sound.musicOn) Sound.toggleMusic(); }
+      else { Sound.setTheme(t); if (!Sound.musicOn) Sound.toggleMusic(); Sound.music('lobby'); }
+      syncMusicUI();
+    }));
     $('#startBtn').onclick = startGame;
+    // Browsers keep audio locked until the first click on the page
+    if (!Sound.ready()) {
+      $('#soundHint').hidden = false;
+      $('#soundHint').onclick = () => { Sound.init(); SFX.unlock(); };
+      Sound.onReady(() => { const h = $('#soundHint'); if (h) h.hidden = true; });
+    }
     $('#lobbyPlayers').onclick = (e) => {
       const el = e.target.closest('.pslot.filled');
       if (!el) return;
@@ -312,6 +330,7 @@
     bar.innerHTML = '';
     renderLobbyPlayers();
     broadcast();
+    Sound.music('lobby');
   }
 
   function renderLobbyPlayers() {
@@ -406,6 +425,7 @@
       </div>`;
     renderBar();
     broadcast();
+    Sound.music('lobby');
     SFX.play('fanfare');
     speak(r.name + (r.sub ? '. ' + r.sub : ''));
     await sleep(3800);
@@ -447,6 +467,7 @@
     renderBar();
     broadcast();
     SFX.play('whoosh');
+    Sound.music('question');
     speak(`הבחירה אצל ${c.name}`);
     timerStart(T.pick, () => onPick(c, Math.floor(Math.random() * S.picks.length), true));
   }
@@ -485,6 +506,7 @@
     renderBar();
     broadcast();
     SFX.play('whoosh');
+    Sound.music('question');
     speak(q.q.replace('_____', ' משהו '));
     timerStart(S.kids ? T.lieKids : T.lie, endLie);
   }
@@ -612,6 +634,7 @@
     bar.innerHTML = '';
     bar.dataset.ids = '';
     broadcast();
+    Sound.stopMusic(0.6); // let the stamps and drumrolls breathe
     const box = $('#revealBox');
     const alive = async (ms) => { await sleep(ms); return tok === S.flow; };
     const pickers = (o) => [...cur.choices].filter(([, id]) => id === o.id).map(([pid]) => S.players.get(pid)).filter(Boolean);
@@ -694,6 +717,7 @@
       </div>`;
     bar.innerHTML = '';
     broadcast();
+    Sound.music('lobby');
     setTimeout(() => {
       $$('.brow .bar i').forEach((i) => (i.style.width = i.dataset.w + '%'));
       const t0 = performance.now();
@@ -755,6 +779,7 @@
     SFX.play('drum');
     if (!(await sleep(2000), tok === S.flow)) return;
     SFX.play('fanfare');
+    Sound.music('victory');
     speak(`${winners.map((w) => w.name).join(' ו')} בראש הטבלה!`);
     const end = Date.now() + 4000;
     (function frame() {
@@ -780,8 +805,20 @@
     if (S.tts && !heVoice) toast('אין קול עברי בדפדפן הזה – נסו כרום או ספארי');
     else toast(S.tts ? 'הקראת שאלות פעילה 🗣️' : 'הקראת שאלות כבויה');
   };
+  function syncMusicUI() {
+    $('#musicBtn').style.opacity = Sound.musicOn ? 1 : 0.4;
+    $$('#themeSeg button').forEach((b) => b.classList.toggle('on', b.dataset.t === 'off' ? !Sound.musicOn : Sound.musicOn && Sound.theme === b.dataset.t));
+  }
+  syncMusicUI();
+  $('#musicBtn').onclick = () => {
+    Sound.init();
+    const on = Sound.toggleMusic();
+    toast(on ? `מוזיקה: ${THEME_LABELS[Sound.theme]}` : 'מוזיקה כבויה');
+    syncMusicUI();
+  };
   $('#muteBtn').onclick = (e) => {
     SFX.muted = !SFX.muted;
+    if (Sound.soundOn === SFX.muted) Sound.toggleSound();
     e.currentTarget.textContent = SFX.muted ? '🔇' : '🔊';
     if (SFX.muted) try { speechSynthesis.cancel(); } catch (err) {}
   };
