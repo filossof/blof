@@ -631,6 +631,8 @@
         card.insertAdjacentHTML('beforeend', '<span class="stamp good">האמת!</span>');
         SFX.play('ding');
         speak(`האמת היא: ${o.text}`);
+        const src = typeof SOURCES !== 'undefined' && SOURCES[cur.q.s];
+        if (src) vd.innerHTML = `<div class="q-sub pop-in">מקור: ${esc(new URL(src).hostname.replace(/^www\./, ''))}</div>`;
         if (ps.length && window.confetti) confetti({ particleCount: 140, spread: 100, origin: { y: 0.45 } });
       } else {
         card.classList.add('lie', 'shake');
