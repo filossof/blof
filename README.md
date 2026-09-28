@@ -23,3 +23,8 @@ Edit `js/questions.js`. `_____` marks the blank; `alt` lists alternative spellin
 python3 -m http.server 8000
 ```
 then open http://localhost:8000/host.html
+
+## Deploying changes
+Browsers cache files from GitHub Pages for ~10 minutes. `tools/bump_versions.py` appends a content hash
+(`?v=…`) to every css/js link so players always get the latest files; run it before committing
+(a local pre-commit hook does this automatically).
