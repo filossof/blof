@@ -75,8 +75,10 @@
     const pid = String(m.pid || '').slice(0, 40);
     if (!pid) return;
     const name = String(m.name || '').replace(/\s+/g, ' ').trim().slice(0, 14) || 'שחקן';
+    const gender = m.g === 'f' ? 'f' : 'm';
     let p = S.players.get(pid);
     if (p) {
+      p.gender = gender;
       if (p.conn && p.conn !== conn) try { p.conn.close(); } catch (e) {}
       p.conn = conn;
       p.online = true;
@@ -85,7 +87,7 @@
         if (AVATARS.includes(m.avatar) && !takenAvatars(p).has(m.avatar)) p.avatar = m.avatar;
       }
     } else {
-      if (S.phase !== 'lobby') return reject(conn, 'המשחק כבר התחיל 🙈 חכו למשחק הבא');
+      if (S.phase !== 'lobby') return reject(conn, `המשחק כבר התחיל 🙈 ${gw(m.g, 'חכה', 'חכי')} למשחק הבא`);
       if (S.players.size >= MAX_PLAYERS) return reject(conn, 'החדר מלא – מקסימום 8 שחקנים');
       const taken = takenAvatars();
       const usedColors = new Set([...S.players.values()].map((x) => x.color));
@@ -94,7 +96,7 @@
         name: uniqueName(name),
         avatar: AVATARS.includes(m.avatar) && !taken.has(m.avatar) ? m.avatar : AVATARS.find((a) => !taken.has(a)),
         color: COLORS.find((c) => !usedColors.has(c)) || COLORS[0],
-        score: 0, conn, online: true, suggest: null,
+        score: 0, conn, online: true, suggest: null, gender,
       };
       S.players.set(pid, p);
       SFX.play('join');
@@ -128,7 +130,7 @@
   function viewFor(p) {
     const v = {
       t: 'view', phase: S.phase, kids: S.kids, vip: isVip(p),
-      me: { name: p.name, avatar: p.avatar, color: p.color, score: p.score },
+      me: { name: p.name, avatar: p.avatar, color: p.color, score: p.score, g: p.gender },
       remain: remainMs(), total: S.timer ? S.total : 0,
     };
     const cur = S.cur;
@@ -294,7 +296,7 @@
       if (!el) return;
       const p = S.players.get(el.dataset.id);
       if (p && confirm(`להוציא את ${p.name} מהמשחק?`)) {
-        if (p.conn) reject(p.conn, 'הוצאתם מהחדר');
+        if (p.conn) reject(p.conn, gw(p.gender, 'הוצאת מהחדר', 'הוצאת מהחדר'));
         S.players.delete(p.id);
         refreshPlayers();
       }
@@ -428,7 +430,7 @@
           <div class="avatar lg bounce" style="--c:${c.color}">${c.avatar}</div>
           <div style="text-align:right">
             <div class="q-text" style="margin:0">הבחירה אצל ${esc(c.name)}!</div>
-            <div class="q-sub">בחרו נושא מהטלפון</div>
+            <div class="q-sub">${esc(c.name)} ${gw(c.gender, 'בוחר', 'בוחרת')} נושא בטלפון</div>
           </div>
           ${timerHTML()}
         </div>
@@ -484,8 +486,8 @@
     text = String(text || '').replace(/\s+/g, ' ').trim().slice(0, MAX_LIE);
     if (!text) return;
     const err = (msg) => { try { p.conn.send({ t: 'lieError', msg }); } catch (e) {} };
-    if (isTruth(text, S.cur.q)) return err('אופס! כתבתם בדיוק את התשובה הנכונה 😅 נסו שקר אחר');
-    if (S.kids && isBad(text)) return err('בואו נשמור על שפה נקייה 😇 נסו משהו אחר');
+    if (isTruth(text, S.cur.q)) return err(`אופס! ${gw(p.gender, 'כתבת', 'כתבת')} בדיוק את התשובה הנכונה 😅 ${gw(p.gender, 'נסה', 'נסי')} שקר אחר`);
+    if (S.kids && isBad(text)) return err(`בוא${gw(p.gender, '', 'י')} נשמור על שפה נקייה 😇 ${gw(p.gender, 'נסה', 'נסי')} משהו אחר`);
     S.cur.lies.set(p.id, { text });
     SFX.play('submit');
     renderBar();

@@ -356,8 +356,15 @@ body.player { min-height: 100dvh; }
 }
 .input:focus { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(255, 210, 63, .3); }
 .input.code { text-align: center; letter-spacing: .3em; text-transform: uppercase; direction: ltr; font-size: 1.8rem; }
-.av-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; }
-.av-grid button { aspect-ratio: 1; font-size: 1.6rem; border-radius: 14px; border: 2px solid transparent; background: var(--glass); cursor: pointer; transition: transform .15s; padding: 0; }
+.av-grid { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 5px; }
+.av-grid button { aspect-ratio: 1; font-size: clamp(1.1rem, 5.2vw, 1.6rem); min-width: 0; border-radius: 14px; border: 2px solid transparent; background: var(--glass); cursor: pointer; transition: transform .15s; padding: 0; }
+.gender-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.gender-row button {
+  display: flex; align-items: center; justify-content: center; gap: 8px; padding: .7em; font-size: 1.2rem; font-weight: 800;
+  color: #fff; background: var(--glass); border: 2px solid transparent; border-radius: 16px; cursor: pointer; transition: transform .15s, background .2s;
+}
+.gender-row button span { font-size: 1.8rem; }
+.gender-row button.on { border-color: var(--accent); background: var(--glass-strong); transform: scale(1.04); }
 .av-grid button.on { border-color: var(--accent); background: var(--glass-strong); transform: scale(1.12); }
 .pq { font-size: 1.35rem; font-weight: 800; line-height: 1.45; margin: 0 0 16px; }
 .pq .blank { min-width: 3em; }

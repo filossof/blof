@@ -11,7 +11,12 @@ const PEER_OPTS = {
   },
 };
 
-const AVATARS = ['🦊', '🐼', '🐸', '🦄', '🐙', '🐯', '🐵', '🦁', '🐧', '🐨', '🐷', '🐲', '🦖', '🐝', '🦉', '🐬'];
+const AVATARS = [
+  '🦊', '🐼', '🐸', '🦄', '🐙', '🐯', '🐵', '🦁', '🐧', '🐨', '🐷', '🐲', '🦖', '🐝', '🦉', '🐬',
+  '🐶', '🐱', '🐰', '🦝', '🐻', '🐮', '🐔', '🦈', '🐳', '🦋', '🐞', '🦜', '🦩', '🐢', '🦒', '🦔',
+];
+// Hebrew is gendered: pick the masculine or feminine form for a player ('m' / 'f')
+const gw = (g, m, f) => (g === 'f' ? f : m);
 const COLORS = ['#ff5d8f', '#ffb703', '#3ddc97', '#4cc9f0', '#b388ff', '#ff8c42', '#f15bb5', '#00f5d4'];
 const MAX_PLAYERS = 8;
 const MIN_PLAYERS = 2;
