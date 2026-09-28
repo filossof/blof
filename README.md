@@ -1,4 +1,6 @@
-# בלוף! – Hebrew Fibbage-style party game
+# Blof (בלוף!) – Hebrew Fibbage-style party game
+
+Play: https://filossof.github.io/blof/
 
 A Hebrew (RTL) bluffing party game that runs entirely on GitHub Pages.
 
