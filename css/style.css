@@ -110,12 +110,13 @@ body.kids .bg span:nth-child(3) { background: #ffe14d; opacity: .4; }
 .icon-btn:hover { background: var(--glass-strong); transform: scale(1.08); }
 
 #toast {
-  position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 140%);
+  position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, calc(100% + 40px));
   background: #fff; color: #1a0b3d; font-weight: 700; padding: .8em 1.4em; border-radius: 999px;
-  box-shadow: var(--shadow); transition: transform .35s cubic-bezier(.2, 1.6, .4, 1); z-index: 100;
+  box-shadow: var(--shadow); transition: transform .35s cubic-bezier(.2, 1.6, .4, 1), opacity .25s, visibility .35s; z-index: 100;
   max-width: calc(100vw - 32px); text-align: center;
+  opacity: 0; visibility: hidden; pointer-events: none;
 }
-#toast.show { transform: translate(-50%, 0); }
+#toast.show { transform: translate(-50%, 0); opacity: 1; visibility: visible; }
 
 .scene { animation: sceneIn .6s cubic-bezier(.2, .9, .3, 1.15) both; }
 @keyframes sceneIn { from { opacity: 0; transform: translateY(30px) scale(.97); } to { opacity: 1; transform: none; } }
