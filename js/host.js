@@ -805,6 +805,7 @@
     if (S.tts && !heVoice) toast('אין קול עברי בדפדפן הזה – נסו כרום או ספארי');
     else toast(S.tts ? 'הקראת שאלות פעילה 🗣️' : 'הקראת שאלות כבויה');
   };
+  if (!Sound.soundOn) Sound.toggleSound(); // the old mute button is gone – never stay silently muted
   function syncMusicUI() {
     $('#musicBtn').style.opacity = Sound.musicOn ? 1 : 0.4;
     $$('#themeSeg button').forEach((b) => b.classList.toggle('on', b.dataset.t === 'off' ? !Sound.musicOn : Sound.musicOn && Sound.theme === b.dataset.t));
@@ -815,12 +816,6 @@
     const on = Sound.toggleMusic();
     toast(on ? `מוזיקה: ${THEME_LABELS[Sound.theme]}` : 'מוזיקה כבויה');
     syncMusicUI();
-  };
-  $('#muteBtn').onclick = (e) => {
-    SFX.muted = !SFX.muted;
-    if (Sound.soundOn === SFX.muted) Sound.toggleSound();
-    e.currentTarget.textContent = SFX.muted ? '🔇' : '🔊';
-    if (SFX.muted) try { speechSynthesis.cancel(); } catch (err) {}
   };
   $('#fsBtn').onclick = () => {
     if (document.fullscreenElement) document.exitFullscreen();

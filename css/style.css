@@ -152,6 +152,7 @@ body.kids .bg span:nth-child(3) { background: #ffe14d; opacity: .4; }
 /* ================= HOST ================= */
 body.host { height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
 .topbar {
+  position: relative; z-index: 10;
   display: flex; align-items: center; gap: 12px; padding: 14px 24px; flex-shrink: 0;
 }
 .topbar .spacer { flex: 1; }
@@ -161,7 +162,14 @@ body.host { height: 100vh; overflow: hidden; display: flex; flex-direction: colu
 }
 .room-chip small { font-weight: 500; color: var(--ink-soft); }
 .room-chip span { letter-spacing: .15em; direction: ltr; }
-#stage { flex: 1; display: flex; align-items: center; justify-content: center; padding: 0 32px 12px; min-height: 0; position: relative; }
+#stage { flex: 1; display: flex; align-items: safe center; justify-content: center; padding: 0 32px 12px; min-height: 0; position: relative; overflow-y: auto; }
+@media (max-height: 820px) {
+  .pslot { aspect-ratio: auto; height: clamp(90px, 16vh, 150px); }
+  .pslot.filled .avatar { width: 48px; height: 48px; font-size: 1.6rem; }
+  .join-card { padding: 18px; gap: 6px; }
+  .room-code { font-size: clamp(2.6rem, 6vw, 4rem); }
+  .btn.big { font-size: 1.25rem; }
+}
 #stage > .scene { width: 100%; max-width: 1400px; }
 
 /* Lobby */
