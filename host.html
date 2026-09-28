@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>בלוף! – מסך ראשי</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🤥</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800;900&family=Secular+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="host">
+  <div class="bg"><span></span><span></span><span></span><span></span></div>
+  <header class="topbar">
+    <h1 class="logo">בלוף!</h1>
+    <div class="spacer"></div>
+    <div class="room-chip" id="roomChip" hidden><small>קוד חדר</small><span></span></div>
+    <button class="icon-btn" id="skipBtn" title="דלג לשלב הבא" hidden>⏭️</button>
+    <button class="icon-btn" id="ttsBtn" title="הקראת שאלות">🗣️</button>
+    <button class="icon-btn" id="muteBtn" title="השתקה">🔊</button>
+    <button class="icon-btn" id="fsBtn" title="מסך מלא">⛶</button>
+  </header>
+  <main id="stage">
+    <div class="scene title-card">
+      <div class="spinner" style="margin:0 auto"></div>
+      <p class="q-sub">פותחים חדר…</p>
+    </div>
+  </main>
+  <footer id="playerbar"></footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+  <script src="js/common.js"></script>
+  <script src="js/questions.js"></script>
+  <script src="js/host.js"></script>
+</body>
+</html>
