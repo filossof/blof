@@ -553,13 +553,25 @@
         <span class="q-cat pop-in">${esc(q.c)}</span>
         <div class="q-text">${qHTML(q.q)}</div>
         <div class="row-center">${timerHTML()}<div class="q-sub">כתבו בטלפון שקר משכנע! 🤫</div></div>
+        <button class="btn ghost small replace-q" id="replaceQ" title="מישהו כבר מכיר את השאלה? החליפו אותה">🔄 שאלה אחרת</button>
       </div>`;
+    $('#replaceQ').onclick = replaceQuestion;
     renderBar();
     broadcast();
     SFX.play('whoosh');
     Sound.music('question');
     speak(q.q.replace('_____', ' משהו '));
     timerStart(S.kids ? T.lieKids : T.lie, endLie);
+  }
+
+  // Someone already knows this one? Swap in a fresh question from the same kind of round.
+  function replaceQuestion() {
+    if (S.phase !== 'lie') return;
+    const final = !!S.plan[S.roundIdx].final;
+    const options = pool(final).filter((q) => q !== S.cur.q);
+    if (!options.length) return toast('אין עוד שאלות להחלפה');
+    toast('🔄 שאלה חדשה!');
+    startQuestion(shuffle(options)[0]);
   }
 
   function onLie(p, text) {

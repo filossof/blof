@@ -221,12 +221,14 @@
     const { remain, total, ...rest } = v;
     const key = JSON.stringify(rest);
     const phaseChanged = !view || view.phase !== v.phase;
+    const questionSwapped = !phaseChanged && v.phase === 'lie' && view.q !== v.q;
     view = v;
     document.body.classList.toggle('kids', !!v.kids);
     $('#me').innerHTML = `<span class="pts">${v.me.score.toLocaleString()}</span><div class="avatar sm" style="--c:${v.me.color}">${v.me.avatar}</div>`;
     if (key === lastKey) return;
     lastKey = key;
-    if (phaseChanged) { buzz(); lieErr = ''; lieOk = ''; draft = ''; }
+    if (phaseChanged || questionSwapped) { buzz(); lieErr = ''; lieOk = ''; draft = ''; }
+    if (questionSwapped) toast('🔄 השאלה הוחלפה – הנה שאלה חדשה');
     timerBar(v);
     (screens[v.phase] || screens.wait)(v);
   }
