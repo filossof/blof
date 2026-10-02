@@ -210,6 +210,8 @@ body.host { height: 100vh; overflow: hidden; display: flex; flex-direction: colu
 .seg button { border: 0; background: none; color: #fff; padding: .45em 1em; border-radius: 999px; cursor: pointer; font-weight: 600; }
 .seg button.on { background: #fff; color: #1a0b3d; }
 .music-pick .seg { flex-wrap: wrap; }
+.btn.small { font-size: .9rem; padding: .45em 1em; }
+.credit { flex-basis: 100%; font-size: .8rem; color: var(--ink-soft); margin-top: -6px; }
 .sound-hint { position: fixed; left: 24px; bottom: 24px; z-index: 20; animation: pulse .8s ease-in-out infinite alternate; }
 .start-row { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
 .start-row .hint { color: var(--ink-soft); }

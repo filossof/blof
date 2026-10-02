@@ -28,3 +28,9 @@ then open http://localhost:8000/host.html
 Browsers cache files from GitHub Pages for ~10 minutes. `tools/bump_versions.py` appends a content hash
 (`?v=…`) to every css/js link so players always get the latest files; run it before committing
 (a local pre-commit hook does this automatically).
+
+## Private question packs
+The big screen can load a question pack from a local JSON file (lobby → שאלות → 📂 טעינת חבילה).
+It's stored only in that browser and never uploaded; phones receive question text from the host during play.
+Format: `{ "name", "credit", "questions": [{ "c", "q" (with "_____"), "a", "alt": [], "lies": [], "kids", "final"? }] }`.
+Packs are kept out of this repo (see .gitignore).

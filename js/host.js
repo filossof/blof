@@ -9,9 +9,14 @@
   const THEME_LABELS = { bouncy: '🎈 קופצני', tropical: '🌴 טרופי', space: '🚀 חלל', lofi: '🎧 לו-פיי', arcade: '🕹️ ארקייד', musicbox: '🎶 תיבת נגינה' };
   const TRUTH_BONUS = 500; // for typing the real answer as your lie (x round multiplier)
 
+  // Optional private question pack (loaded from a local file on this screen, never part of the public site)
+  let PACK = null;
+  try { PACK = JSON.parse(localStorage.getItem('blof.pack') || 'null'); } catch (e) {}
+
   const S = {
     code: null, peer: null,
     kids: lsGet('bluff.kids') === '1',
+    bank: lsGet('blof.bank') === 'builtin' ? 'builtin' : 'pack',
     length: lsGet('bluff.len') || 'normal',
     tts: lsGet('bluff.tts') !== '0',
     phase: 'boot', players: new Map(), used: new Set(),
@@ -278,6 +283,15 @@
             <div class="toggle music-pick">מוזיקה:
               <div class="seg" id="themeSeg">${Sound.themes.map((id) => `<button data-t="${id}" class="${Sound.musicOn && Sound.theme === id ? 'on' : ''}">${THEME_LABELS[id] || id}</button>`).join('')}<button data-t="off" class="${Sound.musicOn ? '' : 'on'}">🔇 בלי</button></div>
             </div>
+            <div class="toggle bank-pick">שאלות:
+              <div class="seg" id="bankSeg">
+                <button data-b="builtin" class="${activeBank() === 'builtin' ? 'on' : ''}">מובנות (${QUESTIONS.length})</button>
+                ${PACK ? `<button data-b="pack" class="${activeBank() === 'pack' ? 'on' : ''}">${esc(PACK.name)} (${PACK.questions.length})</button>` : ''}
+              </div>
+              <button class="btn ghost small" id="packBtn" type="button">📂 ${PACK ? 'החלפת' : 'טעינת'} חבילה</button>
+              <input type="file" id="packFile" accept=".json,application/json" hidden>
+            </div>
+            ${activeBank() === 'pack' && PACK.credit ? `<div class="credit">${esc(PACK.credit)}</div>` : ''}
             <div class="toggle">אורך המשחק:
               <div class="seg" id="lenSeg">${Object.entries({ short: 'קצר', normal: 'רגיל', long: 'ארוך' })
                 .map(([k, l]) => `<button data-k="${k}" class="${S.length === k ? 'on' : ''}">${l}</button>`).join('')}</div>
@@ -309,6 +323,31 @@
       else { Sound.setTheme(t); if (!Sound.musicOn) Sound.toggleMusic(); Sound.music('lobby'); }
       syncMusicUI();
     }));
+    $$('#bankSeg button').forEach((b) => (b.onclick = () => {
+      S.bank = b.dataset.b;
+      lsSet('blof.bank', S.bank);
+      S.used.clear();
+      showLobby();
+    }));
+    $('#packBtn').onclick = () => $('#packFile').click();
+    $('#packFile').onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      try {
+        const pack = JSON.parse(await file.text());
+        const qs = (pack.questions || []).filter((q) => q && typeof q.q === 'string' && q.q.includes('_____') && q.a && Array.isArray(q.lies));
+        if (qs.length < 10) throw new Error('few');
+        PACK = { name: String(pack.name || 'חבילת שאלות').slice(0, 40), credit: String(pack.credit || ''), questions: qs.map((q) => ({ ...q, alt: q.alt || [] })) };
+        localStorage.setItem('blof.pack', JSON.stringify(PACK));
+        S.bank = 'pack';
+        lsSet('blof.bank', 'pack');
+        S.used.clear();
+        toast(`נטענו ${qs.length} שאלות ✅`);
+        showLobby();
+      } catch (err) {
+        toast('הקובץ לא תקין – צריך קובץ חבילת שאלות (JSON)');
+      }
+    };
     $('#startBtn').onclick = startGame;
     // Browsers keep audio locked until the first click on the page. The hint floats (position: fixed) so
     // hiding it never shifts the layout under the cursor mid-click.
@@ -391,10 +430,17 @@
     `<div class="chip"><div class="avatar sm" style="--c:${p.color}">${p.avatar}</div>${esc(p.name)}${pts ? ` <span class="pts">${pts}</span>` : ''}</div>`;
 
   // ---------- Game flow ----------
-  function pool() {
-    const ok = (q) => (!S.kids || q.kids) && !S.used.has(q);
-    let p = QUESTIONS.filter(ok);
-    if (p.length < 4) { S.used.clear(); p = QUESTIONS.filter(ok); }
+  function activeBank() { return S.bank === 'pack' && PACK ? 'pack' : 'builtin'; }
+  function bankQuestions() { return activeBank() === 'pack' ? PACK.questions : QUESTIONS; }
+
+  // Questions for a regular round, or the final round. Packs can mark some questions as final-round ones.
+  function pool(final = false) {
+    const src = bankQuestions();
+    const split = src.some((q) => q.final);
+    const fits = (q) => (!S.kids || q.kids) && (!split || !!q.final === final);
+    let p = src.filter((q) => fits(q) && !S.used.has(q));
+    if (p.length < 4) { src.filter(fits).forEach((q) => S.used.delete(q)); p = src.filter((q) => fits(q) && !S.used.has(q)); }
+    if (!p.length && final) return pool(false);
     return p;
   }
 
@@ -435,7 +481,7 @@
     speak(r.name + (r.sub ? '. ' + r.sub : ''));
     await sleep(3800);
     if (tok !== S.flow) return;
-    if (r.final) startQuestion(shuffle(pool())[0]);
+    if (r.final) startQuestion(shuffle(pool(true))[0]);
     else pickPhase();
   }
 

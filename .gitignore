@@ -1,0 +1,3 @@
+# private question packs never go in the public repo
+*.private.json
+fibbage-he.json
